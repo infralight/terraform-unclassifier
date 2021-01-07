@@ -49,12 +49,25 @@ Resources:
             Action:
               - 's3:Get*'
               - 's3:List*'
-            Resource: !Join [':', ['arn:aws:s3::', !Ref 'InputS3Bucket']]
+            Resource:
+              - !Join [':', ['arn:aws:s3::', !Ref 'InputS3Bucket']]
+              - "Fn::Join": [
+                "", [
+                !Join [':', ['arn:aws:s3::', !Ref 'InputS3Bucket']],
+                "/*"
+              ]
+              ]
 
           - Effect: Allow
             Action: 's3:*'
             Resource:
-              "Fn::GetAtt":  ["OutputBucket", "Arn" ]
+              - "Fn::GetAtt":  ["OutputBucket", "Arn" ]
+              - "Fn::Join": [
+                "", [
+              "Fn::GetAtt":  ["OutputBucket", "Arn" ],
+              "/*"
+              ]
+              ]
 
   UnclassifierLambdaRole:
     Type: AWS::IAM::Role
@@ -86,6 +99,11 @@ Resources:
       Handler: index.lambda_handler
       MemorySize: 128
       Timeout: 30
+      Environment:
+        Variables:
+          INPUT_BUCKET: !Ref InputS3Bucket
+          OUTPUT_BUCKET: !Ref OutputBucket
+          CLASSIFIED_TYPES: !Ref ClassifiedResources
       Role:
         "Fn::GetAtt":  ["UnclassifierLambdaRole", "Arn" ]
 
