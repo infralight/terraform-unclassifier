@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  InputS3Bucket:
+    Description: 'Please input your existing S3 Bucket with Terraform state files:'
+    Type: String
+    MinLength: '3'
+    ConstraintDescription: Please input your existing S3 Bucket with Terraform state files
+
+  ClassifiedResources:
+    Description: 'Please input terraform classified resources (split by , )'
+    Type: String
+    ConstraintDescription: Please input classifies terraform resources (split by , )
+    Default: "aws_acm_certificate"
+
+Resources:
+
+  OutputBucket:
+    Type : "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Join
+        - "-"
+        - - !Ref 'InputS3Bucket'
+          - "unclassified"
+          - !Select
+            - 0
+            - !Split
+              - "-"
+              - !Select
+                - 2
+                - !Split
+                  - "/"
+                  - !Ref "AWS::StackId"
+
+  UnclassifierLambdaPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+
+          - Effect: Allow
+            Action:
+              - 'logs:*'
+            Resource:
+              - 'arn:aws:logs:*:*:*'
+
+          - Effect: Allow
+            Action:
+              - 's3:Get*'
+              - 's3:List*'
+            Resource: !Join [':', ['arn:aws:s3::', !Ref 'InputS3Bucket']]
+
+          - Effect: Allow
+            Action: 's3:*'
+            Resource:
+              "Fn::GetAtt":  ["OutputBucket", "Arn" ]
+
+  UnclassifierLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: terraform-unclassifier
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+            - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Ref UnclassifierLambdaPolicy
+
+  UnclassifierLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: terraform-unclassifier
+      Description: Unclassifying terraform state files with sensitive data (such as certificates)
+      Runtime: python3.7
+      Code:
+        S3Bucket: 'infralight-templates-public'
+        S3Key: 'unclassifier/unclassifier.zip'
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Timeout: 30
+      Role:
+        "Fn::GetAtt":  ["UnclassifierLambdaRole", "Arn" ]
+
+
+  UnclassifierScheduledRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "UnclassifierScheduleRule"
+      ScheduleExpression: "rate(1 minute)"
+      State: "ENABLED"
+      Targets:
+        -
+          Arn:
+            Fn::GetAtt:
+              - "UnclassifierLambdaFunction"
+              - "Arn"
+          Id: "TargetFunctionV1"
+
+  UnclassifierPermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: "UnclassifierLambdaFunction"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn:
+        Fn::GetAtt:
+          - "UnclassifierScheduledRule"
+          - "Arn"
+
+Outputs:
+
+
+  OutputS3BucketName:
+    Description: The name of the unclassified output s3 bucket
+    Value: !GetAtt OutputBucket.Arn
+
+  UnclassifierLambdaArn:
+    Description: Unclassifier lambda ARN
+    Value: !GetAtt UnclassifierLambdaFunction.Arn
