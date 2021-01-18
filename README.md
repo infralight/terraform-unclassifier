@@ -27,7 +27,7 @@ You can control terraform-unclassifier with these parameters:
 | ------ | ------ | ----- |
 | INPUT_BUCKET | Existing S3 Bucket containing sensitive terraform files | Mandatory |
 | OUTPUT_BUCKET | S3 Bucket you wish Terraform-unclassifier to write the newunclassified state file | Mandatory |
-| CLASSIFIED_TYPES | Terraform resources to remove (unclassify). Mmulti resources split by "," <br />Default value is aws_acm_certificate | Optional |
+| CLASSIFIED_TYPES | Terraform resources to remove (unclassify). Multi resources split by "," <br />Default value is aws_acm_certificate | Optional |
 | OUTPUT_DELIMITER | Defines the output delimiter in Output S3 Bucket | Optional |
 | TERRAFORM_STATE_SUFFIX | Defines terraform state files sufix<br />Default value is .tfstate | Optional |
 | HARD_REFRESH | Unclassifing all .tfstate files (even if if they already unclassified)<br />Default value is false | Optional |
